@@ -1,19 +1,24 @@
 package main
 
 import (
-	// Uncomment this line to pass the first stage
 	"encoding/json"
 	"fmt"
 	"os"
 	"strconv"
 	"unicode"
 	"strings"
-	bencode "github.com/jackpal/bencode-go" // Available if you need it!
+	bencode "github.com/jackpal/bencode-go"
 )
 
-// Example:
-// - 5:hello -> hello
-// - 10:hello12345 -> hello12345
+type Torrent struct {
+	Announce string `json:"announce"`
+	Info     struct {
+		Length       int    `json:"length"`
+		Name         string `json:"name"`
+		Piece_length int    `json:"piece_length"`
+		Pieces       string `json:"pieces"`
+	} `json:"info"`
+}
 
 func bencodeNums(bencodedString string) (interface{},error){
 	eIndex := strings.Index(bencodedString,"e")
@@ -48,6 +53,14 @@ func bencodeStrings(bencodedString string) (interface{},error){
 }
 
 func decodeBencode(bencodedString string) (interface{}, error) {
+	if bencodedString[0] == 'd'{
+		reader:= strings.NewReader(bencodedString)
+		val,err := bencode.Decode(reader)
+		if err!=nil{
+			return nil, err
+		}
+		return val,nil
+	}
 	if bencodedString[0] == 'l' {
 		reader:= strings.NewReader(bencodedString)
 		val,err := bencode.Decode(reader)
@@ -74,15 +87,24 @@ func decodeBencode(bencodedString string) (interface{}, error) {
 	}
 }
 
-func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	// fmt.Println("Logs from your program will appear here!")
+func readTorrentFile(filename string) (interface{},error){
+	f,err := os.ReadFile(filename)
+	if err!=nil{
+		return nil, fmt.Errorf(err.Error())
+	}
+	decoded,err := decodeBencode(string(f))
 
+	jsonOutput, _ := json.Marshal(decoded)
+	var torrent Torrent
+	json.Unmarshal(jsonOutput,&torrent)
+
+	return torrent,nil
+}
+
+func main() {
 	command := os.Args[1]
 
 	if command == "decode" {
-		// Uncomment this block to pass the first stage
-		//
 		bencodedValue := os.Args[2]
 		
 		decoded, err := decodeBencode(bencodedValue)
@@ -92,6 +114,16 @@ func main() {
 		}
 		
 		jsonOutput, _ := json.Marshal(decoded)
+		fmt.Println(string(jsonOutput))
+	} else if command == "info"{
+		filename := os.Args[2]
+
+		val,err := readTorrentFile(filename)
+		if err!= nil{
+			fmt.Println(err)
+			return
+		}
+		jsonOutput, _ := json.Marshal(val)
 		fmt.Println(string(jsonOutput))
 	} else {
 		fmt.Println("Unknown command: " + command)
